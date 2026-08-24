@@ -10,11 +10,6 @@ from PIL import Image
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Read key strictly from environment variable
-API_KEY = os.environ.get("GEMINI_API_KEY")
-
-client = genai.Client(api_key=API_KEY)
-
 MODEL_NAME = 'gemini-3.1-pro-preview'
 
 @app.route('/')
@@ -23,6 +18,23 @@ def home():
 
 @app.route('/process-image', methods=['POST'])
 def process_image():
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return jsonify({
+            'extracted_text': 'Configuration Error',
+            'solution_steps': ["<div class='question-header'>NOTICE</div><p style='color:#c91818; font-size:18px;'>GEMINI_API_KEY environment variable is missing on server.</p>"],
+            'graph_data': None
+        }), 200
+
+    try:
+        client = genai.Client(api_key=api_key)
+    except Exception as e:
+        return jsonify({
+            'extracted_text': 'Initialization Error',
+            'solution_steps': [f"<div class='question-header'>NOTICE</div><p style='color:#c91818; font-size:18px;'>{str(e)}</p>"],
+            'graph_data': None
+        }), 200
+
     subject = request.form.get('subject', 'Advanced Mathematics')
     level = request.form.get('level', 'Undergraduate')
     mode = request.form.get('mode', 'Full Working')
