@@ -1,181 +1,121 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mathematics Made Easy - STEM Vision</title>
-    <!-- MathJax for rendering LaTeX -->
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
-    <!-- Plotly for rendering graphs -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #ffffff;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #1a73e8;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #1557b0;
-        }
-        #result-container {
-            margin-top: 30px;
-        }
-        .question-header {
-            color: #c91818;
-            font-weight: bold;
-            font-size: 18px;
-            margin-bottom: 15px;
-        }
-        .math-step {
-            background: #f8f9fa;
-            border-left: 4px solid #1a73e8;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .final-boxed-answer {
-            border: 2px solid #28a745;
-            background-color: #e8f8ec;
-            padding: 15px;
-            font-size: 20px;
-            text-align: center;
-            margin-top: 15px;
-        }
-        #plot-container {
-            margin-top: 20px;
-        }
-    </style>
-</head>
-<body>
+import os
+import json
+import re
+import time
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from google import genai
+from PIL import Image
 
-<div class="container">
-    <h1>Mathematics Made Easy</h1>
-    
-    <form id="solve-form">
-        <div class="form-group">
-            <label for="file">Upload Image of Math Problem:</label>
-            <input type="file" id="file" name="file" accept="image/*">
-        </div>
+app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-        <div class="form-group">
-            <label for="subject">Subject:</label>
-            <select id="subject" name="subject">
-                <option value="Advanced Mathematics">Advanced Mathematics</option>
-                <option value="Calculus">Calculus</option>
-                <option value="Linear Algebra">Linear Algebra</option>
-                <option value="Physics">Physics</option>
-            </select>
-        </div>
+# Read key strictly from environment variable
+API_KEY = os.environ.get("GEMINI_API_KEY")
 
-        <div class="form-group">
-            <label for="level">Academic Level:</label>
-            <select id="level" name="level">
-                <option value="Undergraduate">Undergraduate</option>
-                <option value="High School">High School</option>
-                <option value="Postgraduate">Postgraduate</option>
-            </select>
-        </div>
+client = genai.Client(api_key=API_KEY)
 
-        <div class="form-group">
-            <label for="corrected_text">Manual Text Correction (Optional):</label>
-            <textarea id="corrected_text" name="corrected_text" rows="2" placeholder="Type equation manually if image quality is poor..."></textarea>
-        </div>
+MODEL_NAME = 'gemini-2.5-flash'
 
-        <button type="submit" id="submit-btn">Solve Problem</button>
-    </form>
+@app.route('/')
+def home():
+    return "STEM Vision Backend Running!"
 
-    <div id="result-container">
-        <h2>Solution:</h2>
-        <div id="solution-content">Upload an image and click Solve to generate working out.</div>
-        <div id="plot-container"></div>
-    </div>
-</div>
+@app.route('/process-image', methods=['POST'])
+def process_image():
+    subject = request.form.get('subject', 'Advanced Mathematics')
+    level = request.form.get('level', 'Undergraduate')
+    mode = request.form.get('mode', 'Full Working')
+    layout = request.form.get('layout', 'Block-by-Block')
+    corrected_text = request.form.get('corrected_text', '')
 
-<script>
-document.getElementById('solve-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const submitBtn = document.getElementById('submit-btn');
-    const solutionDiv = document.getElementById('solution-content');
-    const plotDiv = document.getElementById('plot-container');
-    
-    submitBtn.disabled = true;
-    submitBtn.innerText = "Processing Solution...";
-    solutionDiv.innerHTML = "<em>Analyzing image and running model... Please wait.</em>";
-    plotDiv.innerHTML = "";
+    contents = []
 
-    const formData = new FormData(this);
+    if 'file' in request.files and request.files['file'].filename != '':
+        file = request.files['file']
+        try:
+            img = Image.open(file.stream)
+            contents.append(img)
+        except Exception:
+            pass
 
-    try {
-        // Pointing directly to your live Render backend
-        const response = await fetch('https://stem-vision-backend.onrender.com/process-image', {
-            method: 'POST',
-            body: formData
-        });
+    prompt = f"""
+    You are an expert tutor in {subject} tailored for {level} academic level.
+    Explanation Mode: {mode}
+    Layout Preference: {layout}
+    User Manual Text Correction: "{corrected_text}"
 
-        const data = await response.json();
+    Analyze the input equation/document page and output a step-by-step mathematical solution.
 
-        if (data.solution_steps && data.solution_steps.length > 0) {
-            solutionDiv.innerHTML = data.solution_steps.join('<br>');
-            
-            // Re-render MathJax formula expressions
-            if (window.MathJax) {
-                MathJax.typesetPromise([solutionDiv]);
-            }
-        } else {
-            solutionDiv.innerHTML = "No solution steps returned.";
-        }
+    CRITICAL FORMATTING RULES TO PREVENT MATHJAX RENDER OVERLAP:
+    1. First line: Extract and write the exact question statement from the image in red bold text:
+       <div class="question-header">[EXACT QUESTION PROMPT / MAIN EQUATION HERE]</div>
 
-        // Render plot if Plotly JSON data is present
-        if (data.graph_data) {
-            Plotly.newPlot('plot-container', data.graph_data.data || data.graph_data, data.graph_data.layout || {});
-        }
+    2. Standard LaTeX formatting:
+       - Use \\[ ... \\] for standalone block equations.
+       - Use \\( ... \\) for inline math equations inside text.
+       - NEVER nest HTML tags inside LaTeX math delimiters (\\[ or \\().
+       - ALWAYS wrap square root expressions cleanly inside \\sqrt{{...}} with full group brackets.
 
-    } catch (err) {
-        solutionDiv.innerHTML = `<p style="color:red;">Error connecting to backend server: ${err.message}</p>`;
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerText = "Solve Problem";
-    }
-});
-</script>
+    3. Line-by-line working out:
+       Wrap each intermediate math step inside:
+       <div class="math-step">\\[ ... \\]</div>
 
-</body>
-</html>
+    4. Final line: Output the final evaluated answer inside a boxed container:
+       <div class="final-boxed-answer">\\[ ... \\]</div>
+
+    5. GRAPH DETECTION:
+       If the problem involves functions, parabolas, integration area, or 3D surfaces, append a valid JSON block at the very end of your response inside ```json_graph ... ``` tags with Plotly trace data to render the plot.
+    """
+
+    contents.append(prompt)
+
+    response_text = None
+    last_error = None
+
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=contents
+            )
+            response_text = response.text
+            break
+        except Exception as e:
+            last_error = str(e)
+            if "429" in last_error or "RESOURCE_EXHAUSTED" in last_error:
+                time.sleep(3)
+            else:
+                break
+
+    if not response_text:
+        if "429" in str(last_error) or "RESOURCE_EXHAUSTED" in str(last_error):
+            user_msg = "Free tier request quota exceeded. Please wait 30–60 seconds before clicking Solve again."
+        else:
+            user_msg = last_error
+
+        return jsonify({
+            'extracted_text': 'Processing Error',
+            'solution_steps': [f"<div class='question-header'>NOTICE</div><p style='color:#c91818; font-size:18px;'>{user_msg}</p>"],
+            'graph_data': None
+        }), 200
+
+    graph_data = None
+
+    graph_match = re.search(r'```json_graph\s*(.*?)\s*```', response_text, re.DOTALL)
+    if graph_match:
+        try:
+            graph_data = json.loads(graph_match.group(1))
+            response_text = re.sub(r'```json_graph\s*.*?\s*```', '', response_text, flags=re.DOTALL)
+        except Exception:
+            graph_data = None
+
+    return jsonify({
+        'extracted_text': 'Processed via Vision AI',
+        'solution_steps': [response_text],
+        'graph_data': graph_data
+    })
+
+if __name__ == '__main__':
+    print("STEM AI Vision Backend Running on http://127.0.0.1:5000")
+    app.run(host='0.0.0.0', port=5000, debug=True)
