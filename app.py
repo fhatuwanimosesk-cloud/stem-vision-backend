@@ -39,29 +39,59 @@ def process_image():
         except Exception:
             pass
 
+    # Subject-Specific Methodologies
+    subject_rules = {
+        "Advanced Mathematics": """
+            - Show explicit algebraic transformations, integration steps, matrix operations, or ODE solutions.
+            - State any theorems or identities used (e.g., L'Hôpital's Rule, Trigonometric Identities).
+        """,
+        "Physics & Mechanics": """
+            - List 'Given Data' with units and 'Unknown Variables' explicitly.
+            - State applicable physical laws (e.g., Newton's Laws, Energy Conservation, Kirchhoff's Laws).
+            - Include physical SI units in intermediate and final steps.
+        """,
+        "Advanced Statistics": """
+            - Explicitly state H_0 and H_1 hypotheses.
+            - Show test statistics, degrees of freedom, critical values, or p-values.
+        """,
+        "Engineering Sciences": """
+            - Break down circuit analysis, state variables, or thermodynamic relations.
+        """,
+        "Physical Chemistry": """
+            - Show balanced equations, stoichiometry, equilibrium constants (K_c, K_p), or thermodynamics.
+        """,
+        "Computer Science": """
+            - Show formal proof steps, induction logic, or Big-O complexity analysis.
+        """
+    }
+
+    chosen_rule = subject_rules.get(subject, subject_rules["Advanced Mathematics"])
+
     prompt = f"""
     You are an expert tutor in {subject} tailored for {level} academic level.
     Explanation Mode: {mode}
     Layout Preference: {layout}
     User Manual Text Correction: "{corrected_text}"
 
-    Analyze the input equation/document page and output a pure line-by-line mathematical solution.
-    
-    CRITICAL SQUARE ROOT FORMATTING:
-    - ALWAYS wrap square root expressions cleanly inside \\sqrt{{...}} with full group brackets so the radical bar spans across all terms inside.
+    SUBJECT-SPECIFIC METHODOLOGY:
+    {chosen_rule}
 
-    Format requirements:
-    1. First line: Extract and write the exact statement/prompt from the image in red bold text:
-       <span class="question-header">[EXACT QUESTION PROMPT / MAIN EQUATION HERE]</span>
+    MULTI-QUESTION & FORMATTING INSTRUCTIONS:
+    1. MULTI-QUESTION DETECTION: Scan the entire document/image for ALL distinct questions or numbered items (e.g., Question 1, Question 2, 1.1, 1.2, etc.). Solve EVERY question in order from top to bottom.
+    2. HEADER FORMATTING: Start each question with a styled HTML header:
+       <span class="question-header">[QUESTION NUMBER AND PROMPT HERE]</span>
 
-    2. Output intermediate line-by-line working out centered as raw LaTeX wrapped in display math delimiters:
-       <div class="math-step">\\[ ... \\]</div>
+    3. WORKING OUT FORMATTING:
+       - Output line-by-line working out centered using LaTeX display math delimiters:
+         <div class="math-step">\\[ ... \\]</div>
+       - CRITICAL SQUARE ROOT FORMATTING: ALWAYS wrap square root expressions cleanly inside \\sqrt{{...}} with full group brackets.
 
-    3. Final line: Output final evaluated answer inside a wide boxed container:
-       <div class="final-boxed-answer">\\[ ... \\]</div>
+    4. FINAL ANSWER FORMATTING:
+       - Place the final evaluated answer for EACH question inside a boxed container:
+         <div class="final-boxed-answer">\\[ ... \\]</div>
 
-    4. GRAPH DETECTION:
-       If the problem involves functions, parabolas, integration area, or 3D surfaces, append a valid JSON block at the very end of your response inside ```json_graph ... ``` tags with Plotly trace data to render the plot.
+    5. GRAPH DETECTION:
+       - If the problem involves functions, parabolas, integration area, or 3D surfaces, append a valid JSON block at the very end of your response inside ```json_graph ... ``` tags with Plotly trace data to render the plot.
     """
 
     contents.append(prompt)
