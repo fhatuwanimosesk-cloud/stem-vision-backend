@@ -15,7 +15,7 @@ API_KEY = os.environ.get("GEMINI_API_KEY")
 
 client = genai.Client(api_key=API_KEY)
 
-MODEL_NAME = 'gemini-2.5-pro'
+MODEL_NAME = 'gemini-3.1-pro-preview'
 
 @app.route('/')
 def home():
