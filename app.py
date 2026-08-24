@@ -45,22 +45,26 @@ def process_image():
     Layout Preference: {layout}
     User Manual Text Correction: "{corrected_text}"
 
-    Analyze the input equation/document page and output a pure line-by-line mathematical solution.
+    Analyze the input equation/document page and output a step-by-step mathematical solution.
 
-    CRITICAL SQUARE ROOT FORMATTING:
-    - ALWAYS wrap square root expressions cleanly inside \\sqrt{{...}} with full group brackets so the radical bar spans across all terms inside.
+    CRITICAL FORMATTING RULES TO PREVENT MATHJAX RENDER OVERLAP:
+    1. First line: Extract and write the exact question statement from the image in red bold text:
+       <div class="question-header">[EXACT QUESTION PROMPT / MAIN EQUATION HERE]</div>
 
-    Format requirements:
-    1. First line: Extract and write the exact statement/prompt from the image in red bold text:
-       <span class="question-header">[EXACT QUESTION PROMPT / MAIN EQUATION HERE]</span>
+    2. Standard LaTeX formatting:
+       - Use \\[ ... \\] for standalone block equations.
+       - Use \\( ... \\) for inline math equations inside text.
+       - NEVER nest HTML tags inside LaTeX math delimiters (\\[ or \\().
+       - ALWAYS wrap square root expressions cleanly inside \\sqrt{{...}} with full group brackets.
 
-    2. Output intermediate line-by-line working out centered as raw LaTeX wrapped in display math delimiters:
+    3. Line-by-line working out:
+       Wrap each intermediate math step inside:
        <div class="math-step">\\[ ... \\]</div>
 
-    3. Final line: Output final evaluated answer inside a wide boxed container:
+    4. Final line: Output the final evaluated answer inside a boxed container:
        <div class="final-boxed-answer">\\[ ... \\]</div>
 
-    4. GRAPH DETECTION:
+    5. GRAPH DETECTION:
        If the problem involves functions, parabolas, integration area, or 3D surfaces, append a valid JSON block at the very end of your response inside ```json_graph ... ``` tags with Plotly trace data to render the plot.
     """
 
@@ -92,7 +96,7 @@ def process_image():
 
         return jsonify({
             'extracted_text': 'Processing Error',
-            'solution_steps': [f"<span class='question-header'>NOTICE</span><p style='color:#c91818; font-size:18px;'>{user_msg}</p>"],
+            'solution_steps': [f"<div class='question-header'>NOTICE</div><p style='color:#c91818; font-size:18px;'>{user_msg}</p>"],
             'graph_data': None
         }), 200
 
