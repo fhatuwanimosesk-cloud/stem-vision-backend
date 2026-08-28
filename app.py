@@ -5,15 +5,22 @@ import base64
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from dotenv import load_dotenv
 
-load_dotenv()
+# Safely import load_dotenv so server deployments without dotenv don't crash
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-MODEL_NAME = "deepseek/deepseek-r1:free"
+
+# Default vision-capable model on OpenRouter free tier
+MODEL_VISION = "google/gemini-2.0-flash-lite-001:free"
+MODEL_TEXT = "deepseek/deepseek-r1:free"
 
 
 @app.route('/')
@@ -79,16 +86,19 @@ CRITICAL FORMATTING RULES TO PREVENT MATHJAX RENDER OVERLAP:
         "X-Title": "STEM Vision AI Helper"
     }
 
+    # Dynamically select vision vs text model based on file upload
     if file_data_url:
+        selected_model = MODEL_VISION
         message_content = [
             {"type": "text", "text": prompt},
             {"type": "image_url", "image_url": {"url": file_data_url}}
         ]
     else:
+        selected_model = MODEL_TEXT
         message_content = prompt
 
     payload = {
-        "model": MODEL_NAME,
+        "model": selected_model,
         "messages": [{"role": "user", "content": message_content}]
     }
 
