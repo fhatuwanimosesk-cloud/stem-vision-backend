@@ -1,18 +1,17 @@
 import os
 import json
 import re
+import base64
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-# Load variables from a local .env file if present
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-# Pull key directly from environment variables (No raw strings in code!)
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 MODEL_NAME = "deepseek/deepseek-r1:free"
 
@@ -39,6 +38,14 @@ def process_image():
     mode = request.form.get('mode', 'Full Working')
     layout = request.form.get('layout', 'Block-by-Block')
     corrected_text = request.form.get('corrected_text', '')
+
+    # Process uploaded image file into base64 payload if provided
+    file_data_url = None
+    if 'file' in request.files and request.files['file'].filename != '':
+        uploaded_file = request.files['file']
+        mime_type = uploaded_file.mimetype or "image/png"
+        encoded_string = base64.b64encode(uploaded_file.read()).decode('utf-8')
+        file_data_url = f"data:{mime_type};base64,{encoded_string}"
 
     prompt = f"""You are an expert tutor in {subject} tailored for {level} academic level.
 Explanation Mode: {mode}
@@ -73,9 +80,18 @@ CRITICAL FORMATTING RULES TO PREVENT MATHJAX RENDER OVERLAP:
         "X-Title": "STEM Vision AI Helper"
     }
 
+    # Format multi-modal input (text + image) if an image was uploaded
+    if file_data_url:
+        message_content = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": file_data_url}}
+        ]
+    else:
+        message_content = prompt
+
     payload = {
         "model": MODEL_NAME,
-        "messages": [{"role": "user", "content": prompt}]
+        "messages": [{"role": "user", "content": message_content}]
     }
 
     try:
@@ -94,29 +110,4 @@ CRITICAL FORMATTING RULES TO PREVENT MATHJAX RENDER OVERLAP:
             }), 200
 
         result = response.json()
-        response_text = result['choices'][0]['message']['content']
-
-    except Exception as e:
-        return jsonify({
-            'extracted_text': 'Processing Error',
-            'solution_steps': [f"<div class='question-header'>NOTICE</div><p style='color:#c91818; font-size:18px;'>Connection Error: {str(e)}</p>"],
-            'graph_data': None
-        }), 200
-
-    graph_data = None
-    graph_match = re.search(r'```json_graph\s*(.*?)\s*```', response_text, re.DOTALL)
-    if graph_match:
-        try:
-            graph_data = json.loads(graph_match.group(1))
-            response_text = re.sub(r'```json_graph\s*.*?\s*```', '', response_text, flags=re.DOTALL)
-        except Exception:
-            graph_data = None
-
-    return jsonify({
-        'extracted_text': 'Processed via OpenRouter Free AI',
-        'solution_steps': [response_text],
-        'graph_data': graph_data
-    })
-
-
-if __name__ == '__main__':
+        response_text = result['choices'][0]['message']
