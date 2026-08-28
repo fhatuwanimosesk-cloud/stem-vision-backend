@@ -39,7 +39,6 @@ def process_image():
     layout = request.form.get('layout', 'Block-by-Block')
     corrected_text = request.form.get('corrected_text', '')
 
-    # Process uploaded image file into base64 payload if provided
     file_data_url = None
     if 'file' in request.files and request.files['file'].filename != '':
         uploaded_file = request.files['file']
@@ -80,7 +79,6 @@ CRITICAL FORMATTING RULES TO PREVENT MATHJAX RENDER OVERLAP:
         "X-Title": "STEM Vision AI Helper"
     }
 
-    # Format multi-modal input (text + image) if an image was uploaded
     if file_data_url:
         message_content = [
             {"type": "text", "text": prompt},
@@ -110,4 +108,31 @@ CRITICAL FORMATTING RULES TO PREVENT MATHJAX RENDER OVERLAP:
             }), 200
 
         result = response.json()
-        response_text = result['choices'][0]['message']
+        response_text = result['choices'][0]['message']['content']
+
+    except Exception as e:
+        return jsonify({
+            'extracted_text': 'Processing Error',
+            'solution_steps': [f"<div class='question-header'>NOTICE</div><p style='color:#c91818; font-size:18px;'>Connection Error: {str(e)}</p>"],
+            'graph_data': None
+        }), 200
+
+    graph_data = None
+    graph_match = re.search(r'```json_graph\s*(.*?)\s*```', response_text, re.DOTALL)
+    if graph_match:
+        try:
+            graph_data = json.loads(graph_match.group(1))
+            response_text = re.sub(r'```json_graph\s*.*?\s*```', '', response_text, flags=re.DOTALL)
+        except Exception:
+            graph_data = None
+
+    return jsonify({
+        'extracted_text': 'Processed via OpenRouter Free AI',
+        'solution_steps': [response_text],
+        'graph_data': graph_data
+    })
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
