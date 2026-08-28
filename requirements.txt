@@ -1,6 +1,5 @@
-flask
+Flask
 flask-cors
-google-genai
-pillow
+requests
+python-dotenv
 gunicorn
-anthropic
